@@ -1,0 +1,38 @@
+            pools = []
+            for bi, w in enumerate(seqs):
+                hh = h[bi][m[bi]]
+                if hh.shape[0] == len(w) + 2:
+                    hh = hh[1:-1]
+                pools.append(hh)
+            # FSQCode pools 4:1 internally, on ONE sequence's token hidden.
+            # Feeding it pre-pooled rows silently yields 6 codes instead of 25.
+            codes = [model.fsq(q.to(DEV))[0] for q in pools]
+            nlist = [int(c.shape[0]) for c in codes]
+            if len(set(nlist)) == 1:
+                ncode = nlist[0]
+                code = torch.cat(codes, 0)
+                idx = perm[code] if perm is not None else code
+                if a.tag == "zero":
+                    v = torch.zeros(idx.shape[0], model.rna_emb.weight.shape[1],
+                                    device=DEV, dtype=model.rna_emb.weight.dtype)
+                else:
+                    v = model.rna_emb(idx)
+                ids = make_prompt(tk, ncode, a.question)
+                it = torch.tensor(ids, device=DEV)
+                e = model.base_emb(it.clamp(max=tk.base_vocab - 1))
+                e = e.unsqueeze(0).repeat(len(chunk), 1, 1)
+                e[:, it >= tk.base_vocab, :] = v.reshape(len(chunk), ncode, e.shape[-1])
+                am = torch.ones(len(chunk), it.shape[0], device=DEV, dtype=torch.long)
+                hs = body(inputs_embeds=e, attention_mask=am, use_cache=False)
+                hs = hs.last_hidden_state[:, -1].float().cpu()
+            else:
+                outs = []
+                for c in codes:
+                    idx = perm[c] if perm is not None else c
+                    vv = model.rna_emb(idx)
+                    ids = make_prompt(tk, vv.shape[0], a.question)
+                    it = torch.tensor(ids, device=DEV).unsqueeze(0)
+                    ee = model.embed(it, vv)
+                    outs.append(body(inputs_embeds=ee, attention_mask=torch.ones_like(it),
+                                     use_cache=False).last_hidden_state[:, -1])
+                hs = torch.cat(outs, 0).float().cpu()

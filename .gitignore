@@ -1,0 +1,37 @@
+# Derived / large assets — never commit
+.venv/
+data/
+models/
+runs/
+work/
+gguf/
+checkpoints/
+logs/
+tmp/
+reports/
+_hf_upload/
+_rnafm_parts/
+_speedtest/
+colab/*.zip
+
+# Weights / binaries
+*.safetensors
+*.pt
+*.bin
+*.gguf
+*.zip
+*.part
+
+# Caches
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Secrets and local agent state
+.gh_token
+.env
+.claude/
+.claude-flow/
+
+# Logs
+*.log

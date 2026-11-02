@@ -1,0 +1,70 @@
+    feats, meta = [], []
+    import time as _t
+    st = _t.time()
+    done = 0
+    with torch.inference_mode():
+        for b0 in range(0, len(todo), a.bs):
+            chunk = todo[b0:b0 + a.bs]
+            seqs = [w for _r, _j, w in chunk]
+            o = enc(seqs); h = o.hidden.float(); m = o.mask.squeeze(-1) > 0
+            pools = []
+            for bi, w in enumerate(seqs):
+                hh = h[bi][m[bi]]
+                if hh.shape[0] == len(w) + 2:
+                    hh = hh[1:-1]
+                if hh.shape[0] % 4:
+                    hh = hh[: hh.shape[0] // 4 * 4]
+                pools.append(hh.view(-1, 4, hh.shape[-1]).mean(1))
+            sizes = {q.shape[0] for q in pools}
+            if len(sizes) == 1:
+                ncode = sizes.pop()
+                pooled = torch.stack(pools, 0).to(DEV)
+                flat = pooled.reshape(-1, pooled.shape[-1])
+                code, _c1, _c2, _c3 = model.fsq(flat)
+                idx = perm[code] if perm is not None else code
+                if a.tag == "zero":
+                    v = torch.zeros(idx.shape[0], model.rna_emb.weight.shape[1],
+                                    device=DEV, dtype=model.rna_emb.weight.dtype)
+                else:
+                    v = model.rna_emb(idx)
+                ids = make_prompt(tk, ncode, a.question)
+                it = torch.tensor(ids, device=DEV)
+                e = model.base_emb(it.clamp(max=tk.base_vocab - 1))
+                e = e.unsqueeze(0).repeat(len(chunk), 1, 1)
+                e[:, it >= tk.base_vocab, :] = v.view(len(chunk), ncode, -1)
+                am = torch.ones(len(chunk), it.shape[0], device=DEV, dtype=torch.long)
+                hs = body(inputs_embeds=e, attention_mask=am, use_cache=False)
+                hs = hs.last_hidden_state[:, -1].float().cpu()
+            else:
+                outs = []
+                for q in pools:
+                    qq = q.to(DEV)
+                    code, _c1, _c2, _c3 = model.fsq(qq)
+                    idx = perm[code] if perm is not None else code
+                    if a.tag == "zero":
+                        v = torch.zeros(idx.shape[0], model.rna_emb.weight.shape[1],
+                                        device=DEV, dtype=model.rna_emb.weight.dtype)
+                    else:
+                        v = model.rna_emb(idx)
+                    ids = make_prompt(tk, v.shape[0], a.question)
+                    it = torch.tensor(ids, device=DEV).unsqueeze(0)
+                    e = model.embed(it, v)
+                    outs.append(body(inputs_embeds=e, attention_mask=torch.ones_like(it),
+                                     use_cache=False).last_hidden_state[:, -1])
+                hs = torch.cat(outs, 0).float().cpu()
+
+            for (r, j, w), row in zip(chunk, hs):
+                feats.append(row)
+                meta.append(dict(uid=r["uid"], gene=r["gene"], chrom=r["chrom"],
+                                 pair_id=r["pair_id"], label=int(r["label"]),
+                                 win=j, length=int(r["length"]),
+                                 wt_dsrna=float(r["wt_dsrna"]),
+                                 rel_change=float(r["rel_change"]),
+                                 gc=float((w.count("G") + w.count("C")) / max(len(w), 1)),
+                                 st=f94.features(w)))
+            done += len(chunk)
+            if (b0 // a.bs) % 5 == 0 or done >= len(todo):
+                el = _t.time() - st
+                print(f"[extract] {done}/{len(todo)}  {el / max(done,1)*1000:.0f} ms/win  "
+                      f"eta {(len(todo) - done) * el / max(done,1) / 60:.1f} min", flush=True)
+            model._usage_parts = None

@@ -1,0 +1,5 @@
+https://huggingface.co/multimolecule/rnafm/resolve/main/model.safetensors
+https://hf-mirror.com/multimolecule/rnafm/resolve/main/model.safetensors
+  dir=C:\qwen-api\RNAQwen\models\rnafm
+  out=model.safetensors
+  checksum=sha-256=ec69333eb894dbefb580e690b0cbe1cbae9845fefd2bc78da914cd14226a2828

@@ -1,0 +1,13 @@
+[
+  {
+    "name": "stage1_R_track",
+    "log": "logs/stage1_R.log",
+    "args": ["scripts/20_train_stage1.py",
+      "--data","data/processed/rnaqa_rnacentral_all.jsonl","--target-field","annotation",
+      "--llm","models/Qwen3-8B","--encoder","models/rnafm",
+      "--epochs","10","--batch-size","1","--grad-accum","1",
+      "--lr","1e-4","--lr-final","8e-5","--warmup-steps","2048","--weight-decay","0.05",
+      "--val-from","data/evalset","--eval-every","200","--eval-samples","32",
+      "--tag","R","--out","checkpoints/stage1"]
+  }
+]

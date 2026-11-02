@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RNAQwen-preview</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #14171c; --muted: #6b7280;
+    --line: #e2e5ea; --accent: #3b5bdb; --accent-soft: #e8ecfb;
+    --ok: #2f9e44; --warn: #b45309; --bad: #c92a2a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 20px;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: 0;
+              white-space: nowrap; }
+  header .spacer { flex: 1; }
+  #backendChip { max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+                 white-space: nowrap; }
+  @media (max-width: 620px) { #backendChip { display: none; } }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px;
+    border: 1px solid var(--line); border-radius: 999px; font-size: 12px;
+    color: var(--muted); background: #fbfbfc;
+  }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .chip.ok .dot { background: var(--ok); }
+  .chip.warn .dot { background: var(--warn); }
+  .chip.bad .dot { background: var(--bad); }
+  .mono { font-family: var(--mono); }
+  main { padding: 16px 20px 40px; max-width: 1180px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  section {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px;
+  }
+  section > h2 {
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--muted); margin: 0 0 10px;
+  }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+  textarea, input[type="text"], input[type="number"], select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: #fff; color: var(--ink); font: inherit;
+  }
+  textarea { min-height: 132px; resize: vertical; font-family: var(--mono); font-size: 13px; }
+  textarea:focus, input:focus, select:focus {
+    outline: 2px solid var(--accent-soft); border-color: var(--accent);
+  }
+  .row { display: flex; gap: 12px; align-items: flex-end; }
+  .row > * { min-width: 0; }
+  .row .grow { flex: 1; }
+  .row + .row { margin-top: 12px; }
+  .counters { display: flex; gap: 14px; color: var(--muted); font-size: 12px;
+              margin-top: 6px; font-family: var(--mono); }
+  .counters .warn { color: var(--warn); }
+  button {
+    display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px;
+    border: 1px solid var(--line); border-radius: 6px; background: #fff;
+    color: var(--ink); font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: #c9ced6; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #33509d; border-color: #33509d; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button svg { display: block; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .answer {
+    font-family: var(--mono); font-size: 30px; line-height: 1.25; letter-spacing: .02em;
+    min-height: 44px; word-break: break-all;
+  }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .meta span {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; background: #fbfbfc;
+  }
+  details { margin-top: 12px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  details pre {
+    font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-all;
+    background: #fbfbfc; border: 1px solid var(--line); border-radius: 6px;
+    padding: 8px 10px; margin: 8px 0 0;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  td.mono, th.mono { font-family: var(--mono); }
+  .empty { color: var(--muted); }
+  .history { margin-top: 16px; }
+  .err { color: var(--bad); font-family: var(--mono); font-size: 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>RNAQwen-preview</h1>
+  <span class="chip ok" id="chip"><span class="dot"></span><span id="chipText">连接中</span></span>
+  <span class="spacer"></span>
+  <span class="chip mono" id="backendChip">--</span>
+</header>
+<main>
+  <div class="grid">
+    <section>
+      <h2>输入</h2>
+      <label for="seq">RNA 序列</label>
+      <textarea id="seq" spellcheck="false" autocomplete="off"
+        placeholder="AUAAAGGAAGUUAGGCUGAGGGGCAGAGAGCGAGACUUUU"></textarea>
+      <div class="counters">
+        <span id="nt">0 nt</span><span id="codes">0 码</span><span id="warn"></span>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div class="grow">
+          <label for="tpl">问题模板</label>
+          <select id="tpl"></select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <label for="q">问题</label>
+          <input type="text" id="q" spellcheck="false">
+        </div>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <label for="temp">temperature <span class="mono" id="tempVal">0.0</span></label>
+          <input type="range" id="temp" min="0" max="1" step="0.1" value="0">
+        </div>
+        <div style="width:110px">
+          <label for="mt">最大 tokens</label>
+          <input type="number" id="mt" min="1" max="256" step="1" value="32">
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="primary" id="run" title="运行 (Ctrl+Enter)">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="runLabel">运行</span>
+        </button>
+        <button id="clear" title="清空">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+          <span>清空</span>
+        </button>
+      </div>
+      <div class="err" id="err"></div>
+    </section>
+    <section>
+      <h2>回答</h2>
+      <div class="answer" id="answer"><span class="empty">--</span></div>
+      <div class="meta" id="meta"></div>
+      <details>
+        <summary>原始输出</summary>
+        <pre id="raw">--</pre>
+      </details>
+    </section>
+  </div>
+  <section class="history">
+    <h2>最近</h2>
+    <table>
+      <thead><tr><th style="width:96px">时间</th><th>问题</th><th style="width:70px">nt</th>
+        <th style="width:70px">码</th><th class="mono">回答</th><th style="width:80px">ms</th></tr></thead>
+      <tbody id="hist"><tr><td colspan="6" class="empty">--</td></tr></tbody>
+    </table>
+  </section>
+</main>
+<script>
+const el = (id) => document.getElementById(id);
+const state = { templates: [], maxNt: 512, busy: false, health: null, history: [] };
+
+function normSeq(s) {
+  let t = (s || "").toUpperCase().replace(/[^A-Z]/g, "");
+  return t;
+}
+
+function stats() {
+  const raw = el("seq").value || "";
+  const clean = normSeq(raw).replace(/T/g, "U").slice(0, state.maxNt);
+  const nt = clean.length;
+  el("nt").textContent = nt + " nt";
+  el("codes").textContent = Math.ceil(nt / 4) + " 码";
+  const warned = /T/.test(normSeq(raw));
+  const over = normSeq(raw).length > state.maxNt;
+  el("warn").textContent = over ? "超出 " + state.maxNt + " nt，已截断"
+    : (warned ? "含 T，按 U 处理" : "");
+  el("warn").className = (over || warned) ? "warn" : "";
+  return clean;
+}
+
+async function pollHealth() {
+  let h = null;
+  try { h = await fetch("/health").then((r) => r.json()); } catch (e) { h = null; }
+  state.health = h;
+  const chip = el("chip"), txt = el("chipText");
+  chip.className = "chip";
+  if (!h) { chip.classList.add("bad"); txt.textContent = "本服务离线"; }
+  else {
+    el("backendChip").textContent = h.backend.url;
+    if (!h.backend.ok) { chip.classList.add("bad"); txt.textContent = "后端离线"; }
+    else if (!h.rna_side.loaded) { chip.classList.add("warn"); txt.textContent = "RNA 侧加载中"; }
+    else { chip.classList.add("ok"); txt.textContent = "就绪 · " + h.model; }
+  }
+  el("run").disabled = state.busy || !h || !h.backend.ok || !h.rna_side.loaded;
+}
+
+function renderRun(r) {
+  el("answer").textContent = r.answer || "--";
+  const bits = ["码 " + r.codes, "prompt " + r.tokens + " tok", r.ms + " ms"];
+  if (r.predicted != null) bits.push("生成 " + r.predicted + " tok");
+  if (r.stopped != null) bits.push(r.stopped ? "停在边界" : "未停");
+  el("meta").innerHTML = bits.map((b) => "<span>" + b + "</span>").join("");
+  el("raw").textContent = r.raw || "--";
+  state.history.unshift({
+    t: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
+    q: r.question, nt: r.nt, codes: r.codes, answer: r.answer, ms: r.ms,
+  });
+  state.history = state.history.slice(0, 8);
+  el("hist").innerHTML = state.history.map((h) =>
+    "<tr><td class='mono'>" + h.t + "</td><td>" + esc(h.q) + "</td><td class='mono'>"
+    + h.nt + "</td><td class='mono'>" + h.codes + "</td><td class='mono'>"
+    + esc(h.answer) + "</td><td class='mono'>" + h.ms + "</td></tr>").join("");
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+
+async function run() {
+  if (state.busy) return;
+  const seq = stats();
+  el("err").textContent = "";
+  if (!seq) { el("err").textContent = "序列是空的"; return; }
+  state.busy = true;
+  el("run").disabled = true;
+  el("runLabel").textContent = "运行中";
+  try {
+    const body = {
+      sequence: seq, question: el("q").value,
+      max_new_tokens: Number(el("mt").value) || 32,
+      temperature: Number(el("temp").value) || 0,
+    };
+    const res = await fetch("/rna/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    renderRun(data);
+  } catch (e) {
+    el("err").textContent = String(e.message || e);
+  } finally {
+    state.busy = false;
+    el("runLabel").textContent = "运行";
+    pollHealth();
+  }
+}
+
+async function boot() {
+  try {
+    const t = await fetch("/templates").then((r) => r.json());
+    state.templates = t.templates || [];
+    state.maxNt = t.max_nt || 512;
+    el("tpl").innerHTML = state.templates.map((q, i) =>
+      "<option value='" + esc(q) + "'>" + esc(q) + "</option>").join("");
+    el("q").value = state.templates[0] || "";
+    el("seq").value = "AUAAAGGAAGUUAGGCUGAGGGGCAGAGAGCGAGACUUUU";
+  } catch (e) { /* the health poll reports it */ }
+  stats();
+  pollHealth();
+  setInterval(pollHealth, 5000);
+}
+
+el("seq").addEventListener("input", stats);
+el("tpl").addEventListener("change", () => { el("q").value = el("tpl").value; });
+el("temp").addEventListener("input", () => { el("tempVal").textContent = Number(el("temp").value).toFixed(1); });
+el("run").addEventListener("click", run);
+el("clear").addEventListener("click", () => {
+  el("seq").value = ""; el("err").textContent = ""; stats();
+});
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run(); }
+});
+boot();
+</script>
+</body>
+</html>
